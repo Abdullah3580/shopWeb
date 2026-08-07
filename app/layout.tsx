@@ -4,6 +4,7 @@ import { CartProvider } from "@/lib/cart-context";
 import { WishlistProvider } from "@/lib/wishlist-context";
 import Header from "@/components/Header";
 import WhatsAppButton from "@/components/WhatsAppButton";
+import NewsletterForm from "@/components/NewsletterForm";
 
 export const metadata: Metadata = {
   title: "MyShopBD | সব কিছু, এক জায়গায়",
@@ -41,16 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <div>
                   <h4 className="text-white font-semibold mb-2">খবর ও অফার</h4>
                   <p className="mb-2 text-gray-400">নতুন প্রোডাক্ট ও অফারের আপডেট পেতে সাবস্ক্রাইব করুন।</p>
-                  <form className="flex gap-2" onSubmit={(e) => e.preventDefault()}>
-                    <input
-                      type="email"
-                      placeholder="ইমেইল"
-                      className="flex-1 min-w-0 rounded-lg px-3 py-2 text-gray-900 text-sm"
-                    />
-                    <button className="bg-brand-600 hover:bg-brand-700 text-white text-sm px-4 rounded-lg">
-                      Send
-                    </button>
-                  </form>
+                  <NewsletterForm />
                 </div>
               </div>
               <div className="border-t border-gray-800 py-4 text-center text-xs text-gray-500">
