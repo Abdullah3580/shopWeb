@@ -1,0 +1,29 @@
+"use client";
+
+import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
+import Link from "next/link";
+
+function CancelContent() {
+  const params = useSearchParams();
+  const order = params.get("order");
+
+  return (
+    <div className="text-center py-20">
+      <div className="text-5xl mb-4">⚠️</div>
+      <h1 className="text-2xl font-bold mb-2">পেমেন্ট বাতিল করা হয়েছে</h1>
+      {order && <p className="text-gray-600 mb-6">অর্ডার আইডি: {order}</p>}
+      <Link href="/cart" className="text-brand-600 font-medium">
+        কার্টে ফিরে যান →
+      </Link>
+    </div>
+  );
+}
+
+export default function CheckoutCancelPage() {
+  return (
+    <Suspense fallback={<div className="text-center py-20 text-gray-500">লোড হচ্ছে...</div>}>
+      <CancelContent />
+    </Suspense>
+  );
+}
