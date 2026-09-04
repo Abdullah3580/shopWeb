@@ -1,0 +1,11 @@
+"use client";
+import Link from "next/link";
+import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+type Suggestion = { products: Array<{ id: string; name: string; slug: string; price: number }>; categories: Array<{ id: string; name: string; slug: string }> };
+export default function SearchBox() {
+  const router = useRouter(); const [query, setQuery] = useState(""); const [data, setData] = useState<Suggestion>({ products: [], categories: [] });
+  useEffect(() => { if (query.trim().length < 2) return setData({ products: [], categories: [] }); const timer = setTimeout(() => { fetch(`/api/search/suggestions?q=${encodeURIComponent(query)}`).then((r) => r.json()).then((result) => setData({ products: result.products || [], categories: result.categories || [] })); }, 180); return () => clearTimeout(timer); }, [query]);
+  function submit(event: FormEvent) { event.preventDefault(); const q = query.trim(); if (!q) return; void fetch("/api/customer/search-history", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q }) }); router.push(`/search?q=${encodeURIComponent(q)}`); setData({ products: [], categories: [] }); }
+  return <form onSubmit={submit} className="relative"><input value={query} onChange={(event) => setQuery(event.target.value)} type="search" placeholder="Search products…" className="w-full rounded-full border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500" />{(data.products.length > 0 || data.categories.length > 0) && <div className="absolute top-full z-50 mt-2 w-full overflow-hidden rounded-xl border bg-white shadow-xl"><div className="p-2">{data.categories.map((category) => <Link key={category.id} href={`/category/${category.slug}`} className="block rounded px-3 py-2 text-sm hover:bg-orange-50">Category · {category.name}</Link>)}{data.products.map((product) => <Link key={product.id} href={`/product/${product.slug}`} className="flex justify-between rounded px-3 py-2 text-sm hover:bg-orange-50"><span>{product.name}</span><span>৳{product.price}</span></Link>)}</div><button className="w-full border-t px-3 py-2 text-left text-sm font-medium text-orange-600">Search for “{query}”</button></div>}</form>;
+}

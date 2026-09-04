@@ -5,6 +5,8 @@ import { useCart } from "@/lib/cart-context";
 import { OfferBar } from "@/components/Hero";
 import { useEffect, useState } from "react";
 import { useWishlist } from "@/lib/wishlist-context";
+import SearchBox from "@/components/SearchBox";
+import MegaMenu from "@/components/MegaMenu";
 
 export default function Header() {
   const { totalCount } = useCart();
@@ -23,10 +25,11 @@ export default function Header() {
           </Link>
 
           <div className="flex-1 max-w-xl hidden md:block">
+            <SearchBox />
             <input
               type="text"
               placeholder="প্রোডাক্ট খুঁজুন..."
-              className="w-full border rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="hidden"
             />
           </div>
 
@@ -51,6 +54,7 @@ export default function Header() {
           {authenticated ? <div className="group relative"><button className="rounded-lg px-3 py-2 text-sm hover:bg-gray-100">Account ▾</button><div className="invisible absolute right-0 top-full z-50 w-44 rounded-lg border bg-white p-2 opacity-0 shadow-lg transition group-hover:visible group-hover:opacity-100"><Link href="/account" className="block rounded px-3 py-2 text-sm hover:bg-orange-50">My Account</Link><Link href="/account/orders" className="block rounded px-3 py-2 text-sm hover:bg-orange-50">My Orders</Link><Link href="/account/wishlist" className="block rounded px-3 py-2 text-sm hover:bg-orange-50">Wishlist</Link><button onClick={logout} className="block w-full rounded px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50">Logout</button></div></div> : <Link href="/account/login" className="hidden rounded-lg px-3 py-2 text-sm font-medium hover:bg-gray-100 sm:block">Login</Link>}
         </div>
       </header>
+      <MegaMenu />
     </div>
   );
 }
