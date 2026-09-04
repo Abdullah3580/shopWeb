@@ -29,11 +29,16 @@ export async function POST(req: NextRequest) {
     if (!name || !phone || !address || !city || !paymentMethod || items.length === 0 || items.length > 50) {
       return NextResponse.json({ error: "Invalid checkout details" }, { status: 400 });
     }
-      const supabase = supabaseAdmin();
-      const { data: settings, error: settingsError } = await supabase.from("store_settings").select("cod_enabled,sslcommerz_enabled").eq("id", 1).single();
-      if (settingsError || !settings || (paymentMethod === "cod" && !settings.cod_enabled) || (paymentMethod === "sslcommerz" && !settings.sslcommerz_enabled)) {
-        return NextResponse.json({ error: "This payment method is currently unavailable." }, { status: 400 });
-      }
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (paymentMethod === "sslcommerz" && (!appUrl || !process.env.SSLCZ_STORE_ID || !process.env.SSLCZ_STORE_PASSWORD)) {
+      return NextResponse.json({ error: "Payment configuration is incomplete" }, { status: 503 });
+    }
+
+    const supabase = supabaseAdmin();
+    const { data: settings, error: settingsError } = await supabase.from("store_settings").select("cod_enabled,sslcommerz_enabled").eq("id", 1).single();
+    if (settingsError || !settings || (paymentMethod === "cod" && !settings.cod_enabled) || (paymentMethod === "sslcommerz" && !settings.sslcommerz_enabled)) {
+      return NextResponse.json({ error: "This payment method is currently unavailable." }, { status: 400 });
+    }
 
     const normalizedItems = items.map((item) => ({ product_id: typeof item.product_id === "string" ? item.product_id : "", quantity: Number(item.quantity) }));
     if (normalizedItems.some((item) => !/^[0-9a-f-]{36}$/i.test(item.product_id) || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 99)) {
@@ -65,8 +70,6 @@ export async function POST(req: NextRequest) {
 
     if (paymentMethod === "cod") return NextResponse.json({ tranId: order.tran_id, total: order.total });
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-    if (!appUrl) return NextResponse.json({ error: "Payment configuration is incomplete" }, { status: 500 });
     try {
       const gatewayUrl = await initiateSSLCommerzPayment({
         tranId: order.tran_id,
