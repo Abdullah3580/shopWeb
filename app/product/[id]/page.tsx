@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabase";
 import { notFound } from "next/navigation";
 import AddToCartButton from "@/components/AddToCartButton";
+import RecentlyViewedTracker from "@/components/RecentlyViewedTracker";
 
 export const revalidate = 60;
 
@@ -18,6 +19,7 @@ export default async function ProductPage({ params }: { params: { id: string } }
 
   return (
     <div className="grid md:grid-cols-2 gap-8">
+      <RecentlyViewedTracker productId={product.id} />
       <div className="aspect-square bg-white rounded-xl border overflow-hidden">
         <img
           src={product.images?.[0] || "https://placehold.co/600x600?text=No+Image"}
