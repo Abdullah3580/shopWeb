@@ -3,7 +3,6 @@ import ProductCard from "@/components/ProductCard";
 import { Hero } from "@/components/Hero";
 import FeaturedProduct from "@/components/FeaturedProduct";
 import TrustBadges from "@/components/TrustBadges";
-import Testimonials from "@/components/Testimonials";
 import { Category, Product } from "@/lib/types";
 
 export const revalidate = 60;
@@ -47,7 +46,6 @@ export default async function HomePage() {
         </p>
       )}
 
-      <Testimonials />
       <TrustBadges />
     </div>
   );

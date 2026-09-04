@@ -2,67 +2,50 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { validateSSLCommerzTransaction } from "@/lib/sslcommerz";
 
-// SSLCommerz calls this endpoint two ways:
-// 1. Browser redirect (success_url/fail_url/cancel_url) — has ?redirect=success|fail|cancel
-// 2. Server-to-server IPN (ipn_url) — no "redirect" query param, just confirms payment async
+type PaymentStatus = "paid" | "failed" | "cancelled";
+
 async function handle(req: NextRequest) {
-  const searchParams = req.nextUrl.searchParams;
-  const redirectType = searchParams.get("redirect"); // success | fail | cancel | null
-  const tranIdFromQuery = searchParams.get("tran_id");
-
-  let valId: string | null = null;
-  let tranId = tranIdFromQuery;
-
-  // SSLCommerz posts form-encoded data on both the redirect and the IPN call
+  const redirectType = req.nextUrl.searchParams.get("redirect");
+  const queryTranId = req.nextUrl.searchParams.get("tran_id");
+  let formData: Record<string, string> = {};
   try {
     const form = await req.formData();
-    valId = (form.get("val_id") as string) || null;
-    tranId = (form.get("tran_id") as string) || tranId;
-  } catch {
-    // no body — fine, we may already have tran_id from the query string
+    form.forEach((value, key) => { if (typeof value === "string") formData[key] = value; });
+  } catch { /* Browser redirects may have no form body. */ }
+
+  const tranId = formData.tran_id || queryTranId;
+  const valId = formData.val_id;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (!appUrl || !tranId) {
+    return redirectType ? NextResponse.redirect(`${appUrl || ""}/checkout/fail`) : NextResponse.json({ error: "Missing transaction" }, { status: 400 });
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
   const supabase = supabaseAdmin();
+  const { data: order, error: orderError } = await supabase.from("orders").select("id,tran_id,total,payment_method,payment_status").eq("tran_id", tranId).single();
+  if (orderError || !order) return redirectType ? NextResponse.redirect(`${appUrl}/checkout/fail`) : NextResponse.json({ error: "Order not found" }, { status: 404 });
+  if (order.payment_method !== "sslcommerz") return NextResponse.json({ error: "Invalid payment method" }, { status: 400 });
 
-  if (!tranId) {
-    return redirectType
-      ? NextResponse.redirect(`${appUrl}/checkout/fail`)
-      : NextResponse.json({ error: "Missing tran_id" }, { status: 400 });
+  let paymentStatus: PaymentStatus = redirectType === "cancel" ? "cancelled" : "failed";
+  let validation: Record<string, unknown> = {};
+  if (valId && redirectType !== "cancel") {
+    validation = await validateSSLCommerzTransaction(valId);
+    const valid = (validation.status === "VALID" || validation.status === "VALIDATED")
+      && validation.tran_id === tranId
+      && validation.currency === "BDT"
+      && Number(validation.amount) === Number(order.total);
+    if (valid) paymentStatus = "paid";
   }
 
-  let paymentStatus: "paid" | "failed" | "cancelled" = "failed";
-
-  if (redirectType === "cancel") {
-    paymentStatus = "cancelled";
-  } else if (valId) {
-    // Always re-validate server-side with SSLCommerz — never trust the redirect status alone.
-    const validation = await validateSSLCommerzTransaction(valId);
-    if (validation.status === "VALID" || validation.status === "VALIDATED") {
-      paymentStatus = "paid";
-    }
+  if (order.payment_status !== "paid") {
+    await supabase.from("orders").update({ payment_status: paymentStatus, updated_at: new Date().toISOString() }).eq("id", order.id).neq("payment_status", "paid");
+    await supabase.from("payment_transactions").upsert({ order_id: order.id, tran_id: tranId, gateway: "sslcommerz", gateway_val_id: valId || null, amount: Number(order.total), status: paymentStatus, raw_response: validation }, { onConflict: "tran_id" });
+    if (paymentStatus !== "paid") await supabase.rpc("release_order_inventory", { p_tran_id: tranId });
   }
 
-  await supabase
-    .from("orders")
-    .update({ payment_status: paymentStatus })
-    .eq("tran_id", tranId);
-
-  // Server-to-server IPN call: just acknowledge, no redirect needed
-  if (!redirectType) {
-    return NextResponse.json({ received: true });
-  }
-
-  // Browser redirect: send the customer to the right confirmation page
-  const destination =
-    paymentStatus === "paid" ? "success" : paymentStatus === "cancelled" ? "cancel" : "fail";
-  return NextResponse.redirect(`${appUrl}/checkout/${destination}?order=${tranId}`);
+  if (!redirectType) return NextResponse.json({ received: true });
+  const destination = paymentStatus === "paid" ? "success" : paymentStatus === "cancelled" ? "cancel" : "fail";
+  return NextResponse.redirect(`${appUrl}/checkout/${destination}?order=${encodeURIComponent(tranId)}`);
 }
 
-export async function GET(req: NextRequest) {
-  return handle(req);
-}
-
-export async function POST(req: NextRequest) {
-  return handle(req);
-}
+export async function GET(req: NextRequest) { return handle(req); }
+export async function POST(req: NextRequest) { return handle(req); }

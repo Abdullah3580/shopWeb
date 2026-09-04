@@ -1,17 +1,19 @@
 "use client";
 
 import { useCart } from "@/lib/cart-context";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-
-const SHIPPING_INSIDE_DHAKA = 70;
-const SHIPPING_OUTSIDE_DHAKA = 130;
 
 export default function CheckoutPage() {
   const { items, subtotal } = useCart();
   const router = useRouter();
+  const checkoutKey = useRef(crypto.randomUUID());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [couponCode, setCouponCode] = useState("");
+  const [shippingFees, setShippingFees] = useState<{ inside_dhaka: number; outside_dhaka: number } | null>(null);
+  useEffect(() => { fetch("/api/store-settings").then((response) => response.json()).then((result) => { if (result.settings) setShippingFees({ inside_dhaka: Number(result.settings.inside_dhaka_shipping), outside_dhaka: Number(result.settings.outside_dhaka_shipping) }); }); }, []);
+  useEffect(() => { fetch("/api/customer/addresses").then((response) => response.ok ? response.json() : null).then((result) => { const address = result?.addresses?.find((item: { is_default: boolean }) => item.is_default); if (address) setForm((current) => ({ ...current, name: address.recipient_name, phone: address.phone, address: address.full_address })); }); }, []);
   const [form, setForm] = useState({
     name: "",
     phone: "",
@@ -22,7 +24,7 @@ export default function CheckoutPage() {
   });
 
   const shippingFee =
-    form.city === "inside_dhaka" ? SHIPPING_INSIDE_DHAKA : SHIPPING_OUTSIDE_DHAKA;
+    shippingFees ? (form.city === "inside_dhaka" ? shippingFees.inside_dhaka : shippingFees.outside_dhaka) : 0;
   const total = subtotal + shippingFee;
 
   if (items.length === 0) {
@@ -42,13 +44,11 @@ export default function CheckoutPage() {
     try {
       const res = await fetch("/api/checkout/init", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-idempotency-key": checkoutKey.current },
         body: JSON.stringify({
           customer: form,
           items,
-          subtotal,
-          shippingFee,
-          total,
+          couponCode,
         }),
       });
 
@@ -78,6 +78,17 @@ export default function CheckoutPage() {
     <div className="grid md:grid-cols-3 gap-8">
       <form onSubmit={handleSubmit} className="md:col-span-2 space-y-4">
         <h1 className="text-2xl font-bold mb-2">ডেলিভারি তথ্য</h1>
+
+        <div>
+          <label className="text-sm font-medium">কুপন কোড</label>
+          <input
+            className="w-full border rounded-lg px-3 py-2 mt-1"
+            placeholder="যদি থাকে"
+            value={couponCode}
+            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+          />
+          <p className="text-xs text-gray-500 mt-1">ছাড়টি অর্ডার নিশ্চিত করার সময় সার্ভারে যাচাই হবে।</p>
+        </div>
 
         <div>
           <label className="text-sm font-medium">পুরো নাম</label>
@@ -125,8 +136,8 @@ export default function CheckoutPage() {
             value={form.city}
             onChange={(e) => setForm({ ...form, city: e.target.value })}
           >
-            <option value="inside_dhaka">ঢাকার ভেতরে (৳{SHIPPING_INSIDE_DHAKA})</option>
-            <option value="outside_dhaka">ঢাকার বাইরে (৳{SHIPPING_OUTSIDE_DHAKA})</option>
+            <option value="inside_dhaka">ঢাকার ভেতরে {shippingFees ? `(৳${shippingFees.inside_dhaka})` : "(লোড হচ্ছে...)"}</option>
+            <option value="outside_dhaka">ঢাকার বাইরে {shippingFees ? `(৳${shippingFees.outside_dhaka})` : "(লোড হচ্ছে...)"}</option>
           </select>
         </div>
 
@@ -158,10 +169,10 @@ export default function CheckoutPage() {
 
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !shippingFees}
           className="w-full bg-brand-600 hover:bg-brand-700 disabled:bg-gray-300 text-white font-medium py-3 rounded-lg transition"
         >
-          {loading ? "প্রসেস হচ্ছে..." : `অর্ডার কনফার্ম করুন — ৳${total}`}
+          {loading ? "প্রসেস হচ্ছে..." : !shippingFees ? "সেটিংস লোড হচ্ছে..." : `অর্ডার কনফার্ম করুন — ৳${total}`}
         </button>
       </form>
 

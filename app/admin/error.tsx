@@ -1,0 +1,2 @@
+"use client";
+export default function AdminError({ reset }: { error: Error & { digest?: string }; reset: () => void }) { return <main className="min-h-screen grid place-items-center bg-slate-100 p-5"><div className="max-w-md rounded-xl border bg-white p-6 text-center"><h1 className="text-xl font-bold">Admin area unavailable</h1><p className="mt-2 text-sm text-slate-500">Something went wrong while loading this page.</p><button onClick={reset} className="mt-5 rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white">Try again</button></div></main>; }

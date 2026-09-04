@@ -1,0 +1,28 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+type Order = { id: string; tran_id: string; customer_name: string; customer_phone: string; total: number; payment_status: string; order_status: string; courier_name: string | null; tracking_number: string | null; created_at: string };
+
+export default function AdminOrdersPage() {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [search, setSearch] = useState("");
+  const [orderStatus, setOrderStatus] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  async function load() {
+    setLoading(true); setError("");
+    const params = new URLSearchParams({ page: String(page), page_size: "20" });
+    if (search) params.set("search", search); if (orderStatus) params.set("order_status", orderStatus); if (paymentStatus) params.set("payment_status", paymentStatus); if (from) params.set("from", from); if (to) params.set("to", to);
+    try { const response = await fetch(`/api/admin/orders?${params}`); const result = await response.json(); if (!response.ok) throw new Error(result.error || "Unable to load orders"); setOrders(result.orders || []); setTotalPages(result.totalPages || 1); } catch (err) { setError(err instanceof Error ? err.message : "Unable to load orders"); } finally { setLoading(false); }
+  }
+  useEffect(() => { load(); }, [page, orderStatus, paymentStatus, from, to]);
+  function submit(event: React.FormEvent) { event.preventDefault(); setPage(1); load(); }
+  return <main className="min-h-screen bg-slate-100 p-5 md:p-8"><div className="max-w-7xl mx-auto"><header className="flex flex-wrap justify-between gap-4 mb-7"><div><p className="text-xs uppercase tracking-[.25em] text-orange-600 font-bold">Operations</p><h1 className="text-3xl font-bold">Orders</h1></div><a href="/admin" className="bg-slate-950 text-white rounded-lg px-4 py-2 h-fit text-sm">Back to dashboard</a></header><form onSubmit={submit} className="bg-white border rounded-xl p-4 mb-5 grid sm:grid-cols-2 lg:grid-cols-6 gap-3"><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Order, name, phone" className="border rounded-lg px-3 py-2 lg:col-span-2" /><select value={orderStatus} onChange={(event) => { setOrderStatus(event.target.value); setPage(1); }} className="border rounded-lg px-3 py-2"><option value="">All fulfillment</option><option value="processing">Processing</option><option value="shipped">Shipped</option><option value="delivered">Delivered</option><option value="cancelled">Cancelled</option></select><select value={paymentStatus} onChange={(event) => { setPaymentStatus(event.target.value); setPage(1); }} className="border rounded-lg px-3 py-2"><option value="">All payment</option><option value="pending">Pending</option><option value="paid">Paid</option><option value="failed">Failed</option><option value="cancelled">Cancelled</option></select><input type="date" value={from} onChange={(event) => setFrom(event.target.value)} className="border rounded-lg px-3 py-2" /><input type="date" value={to} onChange={(event) => setTo(event.target.value)} className="border rounded-lg px-3 py-2" /><button className="bg-orange-500 text-white rounded-lg px-4 py-2 font-semibold">Search</button></form>{error && <div className="bg-red-50 text-red-700 rounded-lg p-4 mb-5 flex justify-between"><span>{error}</span><button onClick={load} className="font-semibold">Retry</button></div>}<section className="bg-white border rounded-xl overflow-hidden">{loading ? <div className="p-10 text-center text-slate-500">Loading orders...</div> : <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-slate-50 text-left text-slate-500"><tr><th className="p-4">Order</th><th className="p-4">Customer</th><th className="p-4">Total</th><th className="p-4">Payment</th><th className="p-4">Fulfillment</th><th className="p-4" /></tr></thead><tbody>{orders.map((order) => <tr key={order.id} className="border-t"><td className="p-4 font-semibold">{order.tran_id}<span className="block text-xs text-slate-400">{new Date(order.created_at).toLocaleString()}</span></td><td className="p-4">{order.customer_name}<span className="block text-xs text-slate-400">{order.customer_phone}</span></td><td className="p-4">৳{Number(order.total).toLocaleString()}</td><td className="p-4"><span className="rounded-full bg-slate-100 px-2 py-1 text-xs">{order.payment_status}</span></td><td className="p-4"><span className="rounded-full bg-orange-50 text-orange-700 px-2 py-1 text-xs">{order.order_status}</span>{order.tracking_number && <span className="block text-xs text-slate-400 mt-1">{order.courier_name}: {order.tracking_number}</span>}</td><td className="p-4 text-right"><a href={`/admin/orders/${order.id}`} className="text-orange-600 font-semibold">Details</a></td></tr>)}</tbody></table>{!orders.length && <p className="p-10 text-center text-slate-500">No orders match these filters.</p>}</div>}</section><div className="flex items-center justify-between mt-4 text-sm"><button disabled={page <= 1} onClick={() => setPage(page - 1)} className="border bg-white rounded-lg px-4 py-2 disabled:opacity-40">Previous</button><span>Page {page} of {totalPages}</span><button disabled={page >= totalPages} onClick={() => setPage(page + 1)} className="border bg-white rounded-lg px-4 py-2 disabled:opacity-40">Next</button></div></div></main>;
+}

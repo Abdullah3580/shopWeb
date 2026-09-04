@@ -24,11 +24,11 @@
 - চেকআউট ফর্ম (নাম, ফোন, ঠিকানা, এলাকা অনুযায়ী শিপিং চার্জ)
 - পেমেন্ট: ক্যাশ অন ডেলিভারি + SSLCommerz (bKash/Nagad/Rocket/কার্ড সবই এর মধ্যে দিয়ে আসে)
 - অর্ডার + অর্ডার আইটেম Supabase-এ সেভ হয়, IPN দিয়ে পেমেন্ট স্ট্যাটাস ভেরিফাই হয়
+- অ্যাডমিন ড্যাশবোর্ড: লগইন, ওভারভিউ মেট্রিক্স, প্রোডাক্ট/ক্যাটাগরি CRUD, ইনভেন্টরি ও অর্ডার স্ট্যাটাস ম্যানেজমেন্ট
+- পেমেন্ট ট্রানজ্যাকশন, ইনভেন্টরি অ্যাডজাস্টমেন্ট ও অ্যাডমিন অ্যাক্টিভিটি অডিট লগ
 
 ## যা এখনো নেই (পরের ধাপে যোগ করতে হবে)
-- Admin panel (এখন প্রোডাক্ট/ক্যাটাগরি Supabase Table Editor থেকে ম্যানুয়ালি যোগ করতে হবে)
 - মাল্টি-ভেন্ডর সাপোর্ট (একাধিক সেলার)
-- সার্চ ও ফিল্টার
 - প্রোডাক্ট রিভিউ/রেটিং
 - ইউজার লগইন/অর্ডার হিস্টোরি
 - SMS/ইমেইল নোটিফিকেশন
@@ -45,6 +45,24 @@ npm install
 2. SQL Editor-এ গিয়ে `supabase/schema.sql` এর পুরো কন্টেন্ট রান করুন
 3. এরপর `supabase/seed.sql` রান করুন (স্যাম্পল প্রোডাক্ট দেখতে চাইলে)
 4. Project Settings → API থেকে URL, anon key, service_role key কপি করুন
+
+যদি `categories already exists` error আসে, database আগে থেকেই তৈরি আছে। সেক্ষেত্রে পুরো `schema.sql` আবার চালাবেন না;
+শুধু `supabase/admin-migration.sql` চালান। এটি existing data না মুছে admin dashboard-এর নতুন টেবিলগুলো যোগ করবে।
+
+Phase 5-এর coupons, store settings এবং analytics database অংশের জন্য `supabase/phase5-migration.sql` আলাদা করে চালান।
+Phase 6-এর database reliability hardening-এর জন্য `supabase/phase-06-migration.sql` চালান।
+
+### ৩.১ Admin dashboard সেটআপ
+1. Supabase Dashboard → Authentication → Users থেকে admin/staff user তৈরি করুন।
+2. `supabase/admin-migration.sql` রান করার পর SQL Editor-এ user-এর UUID দিয়ে role assign করুন:
+```sql
+insert into public.admin_user_roles (user_id, role_id)
+select 'AUTH_USER_UUID', id from public.admin_roles where name = 'owner'
+on conflict do nothing;
+```
+3. `/admin` খুলে Supabase Auth email/password দিয়ে sign in করুন।
+
+Roles: `owner`, `manager`, `catalog`, `fulfillment`, `finance`। Product/category actions-এর জন্য `catalog`, আর order actions-এর জন্য `fulfillment` বা `finance` role প্রয়োজন। `owner` সব permission পায়।
 
 ### ৩. Environment variables সেট করুন
 `.env.example` কে `.env.local` নামে কপি করে মান বসান:
@@ -69,8 +87,8 @@ Chosma-র মতোই — GitHub-এ পুশ করে Vercel-এ ইম্�
 `NEXT_PUBLIC_APP_URL` অবশ্যই আপনার Vercel ডোমেইনে আপডেট করবেন, নাহলে SSLCommerz রিডাইরেক্ট কাজ করবে না।
 
 ## প্রোডাক্ট/ক্যাটাগরি যোগ করা
-এখন Supabase Table Editor থেকে `categories` ও `products` টেবিলে সরাসরি সারি (row) যোগ করুন। Admin UI চাইলে
-পরের ধাপে বানানো যাবে (এটা একটা আলাদা বড় ফিচার)।
+`/admin` dashboard থেকে `categories` ও `products` যোগ এবং আপডেট করা যাবে। Database schema পরিবর্তন হলে
+Supabase SQL Editor-এ `supabase/schema.sql` আবার রান করুন (নতুন প্রজেক্টে পুরো ফাইল, existing প্রজেক্টে migration অংশ আলাদা করে চালান)।
 
 ## পরের ধাপগুলো (রিকমেন্ডেশন)
 1. আগে ১০-২০টা রিয়েল প্রোডাক্ট দিয়ে টেস্ট করুন, COD দিয়ে অর্ডার ফ্লো ভেরিফাই করুন

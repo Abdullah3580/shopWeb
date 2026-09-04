@@ -1,92 +1,95 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { initiateSSLCommerzPayment } from "@/lib/sslcommerz";
-import { CartItem } from "@/lib/types";
+import { getCustomerSession } from "@/lib/customer-auth";
+
+type CheckoutBody = {
+  customer?: { name?: unknown; phone?: unknown; email?: unknown; address?: unknown; city?: unknown; payment_method?: unknown };
+  items?: Array<{ product_id?: unknown; quantity?: unknown }>;
+  couponCode?: unknown;
+};
+
+function text(value: unknown, maxLength: number) {
+  return typeof value === "string" && value.trim().length > 0 && value.length <= maxLength ? value.trim() : null;
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { customer, items, subtotal, shippingFee, total } = body as {
-      customer: {
-        name: string;
-        phone: string;
-        email: string;
-        address: string;
-        city: string;
-        payment_method: "cod" | "sslcommerz";
-      };
-      items: CartItem[];
-      subtotal: number;
-      shippingFee: number;
-      total: number;
-    };
+    const body = (await req.json()) as CheckoutBody;
+    const customer = body.customer;
+    const name = text(customer?.name, 120);
+    const phone = text(customer?.phone, 30);
+    const email = customer?.email ? text(customer.email, 160) : null;
+    const address = text(customer?.address, 500);
+    const city = customer?.city === "inside_dhaka" || customer?.city === "outside_dhaka" ? customer.city : null;
+    const paymentMethod = customer?.payment_method === "cod" || customer?.payment_method === "sslcommerz" ? customer.payment_method : null;
+    const couponCode = body.couponCode ? text(body.couponCode, 40) : null;
+    const items = Array.isArray(body.items) ? body.items : [];
 
-    if (!customer?.name || !customer?.phone || !customer?.address || !items?.length) {
-      return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    if (!name || !phone || !address || !city || !paymentMethod || items.length === 0 || items.length > 50) {
+      return NextResponse.json({ error: "Invalid checkout details" }, { status: 400 });
+    }
+      const supabase = supabaseAdmin();
+      const { data: settings, error: settingsError } = await supabase.from("store_settings").select("cod_enabled,sslcommerz_enabled").eq("id", 1).single();
+      if (settingsError || !settings || (paymentMethod === "cod" && !settings.cod_enabled) || (paymentMethod === "sslcommerz" && !settings.sslcommerz_enabled)) {
+        return NextResponse.json({ error: "This payment method is currently unavailable." }, { status: 400 });
+      }
+
+    const normalizedItems = items.map((item) => ({ product_id: typeof item.product_id === "string" ? item.product_id : "", quantity: Number(item.quantity) }));
+    if (normalizedItems.some((item) => !/^[0-9a-f-]{36}$/i.test(item.product_id) || !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 99)) {
+      return NextResponse.json({ error: "Invalid cart item" }, { status: 400 });
     }
 
-    const supabase = supabaseAdmin();
-    const tranId = `ORD-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+    const idempotencyKey = req.headers.get("x-idempotency-key") || crypto.randomUUID();
+    if (idempotencyKey.length < 16 || idempotencyKey.length > 100) return NextResponse.json({ error: "Invalid checkout request" }, { status: 400 });
 
-    // 1. Create the order as "pending"
-    const { data: order, error: orderErr } = await supabase
-      .from("orders")
-      .insert({
-        tran_id: tranId,
-        customer_name: customer.name,
-        customer_phone: customer.phone,
-        customer_email: customer.email || null,
-        shipping_address: customer.address,
-        shipping_city: customer.city,
-        subtotal,
-        shipping_fee: shippingFee,
-        total,
-        payment_method: customer.payment_method,
-        payment_status: customer.payment_method === "cod" ? "pending" : "pending",
-        order_status: "processing",
-      })
-      .select()
-      .single();
-
-    if (orderErr || !order) {
-      console.error(orderErr);
-      return NextResponse.json({ error: "Order creation failed" }, { status: 500 });
-    }
-
-    // 2. Insert line items
-    const lineItems = items.map((i) => ({
-      order_id: order.id,
-      product_id: i.product_id,
-      product_name: i.name,
-      unit_price: i.price,
-      quantity: i.quantity,
-    }));
-    await supabase.from("order_items").insert(lineItems);
-
-    // 3. Cash on delivery: nothing more to do, return tranId for the success page
-    if (customer.payment_method === "cod") {
-      return NextResponse.json({ tranId });
-    }
-
-    // 4. Online payment: create an SSLCommerz session and return the gateway URL
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL!;
-    const gatewayUrl = await initiateSSLCommerzPayment({
-      tranId,
-      totalAmount: total,
-      customerName: customer.name,
-      customerEmail: customer.email,
-      customerPhone: customer.phone,
-      customerAddress: customer.address,
-      customerCity: customer.city,
-      successUrl: `${appUrl}/api/checkout/ipn?redirect=success&tran_id=${tranId}`,
-      failUrl: `${appUrl}/api/checkout/ipn?redirect=fail&tran_id=${tranId}`,
-      cancelUrl: `${appUrl}/api/checkout/ipn?redirect=cancel&tran_id=${tranId}`,
-      ipnUrl: `${appUrl}/api/checkout/ipn`,
+    const { data: order, error } = await supabase.rpc("create_order_with_coupon", {
+      p_idempotency_key: idempotencyKey,
+      p_customer_name: name,
+      p_customer_phone: phone,
+      p_customer_email: email,
+      p_shipping_address: address,
+      p_shipping_city: city,
+      p_payment_method: paymentMethod,
+      p_coupon_code: couponCode,
+      p_items: normalizedItems,
     });
 
-    return NextResponse.json({ tranId, gatewayUrl });
-  } catch (err: any) {
-    console.error(err);
-    return NextResponse.json({ error: err.message || "Server error" }, { status: 500 });
+    if (error || !order) {
+      console.error("Order transaction failed", error);
+      const message = error?.message?.toLowerCase().includes("insufficient stock") ? "One or more products are out of stock." : "Unable to create order. Please try again.";
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+    const customerSession = await getCustomerSession();
+    if (customerSession) await supabase.from("orders").update({ customer_user_id: customerSession.user.id }).eq("id", order.id);
+
+    if (paymentMethod === "cod") return NextResponse.json({ tranId: order.tran_id, total: order.total });
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (!appUrl) return NextResponse.json({ error: "Payment configuration is incomplete" }, { status: 500 });
+    try {
+      const gatewayUrl = await initiateSSLCommerzPayment({
+        tranId: order.tran_id,
+        totalAmount: Number(order.total),
+        customerName: name,
+        customerEmail: email || "no-reply@myshopbd.com",
+        customerPhone: phone,
+        customerAddress: address,
+        customerCity: city,
+        successUrl: `${appUrl}/api/checkout/ipn?redirect=success&tran_id=${order.tran_id}`,
+        failUrl: `${appUrl}/api/checkout/ipn?redirect=fail&tran_id=${order.tran_id}`,
+        cancelUrl: `${appUrl}/api/checkout/ipn?redirect=cancel&tran_id=${order.tran_id}`,
+        ipnUrl: `${appUrl}/api/checkout/ipn`,
+      });
+      return NextResponse.json({ tranId: order.tran_id, gatewayUrl, total: order.total });
+    } catch (paymentError) {
+      console.error("Payment initialization failed", paymentError);
+      await supabase.from("orders").update({ payment_status: "failed" }).eq("id", order.id).eq("payment_status", "pending");
+      await supabase.rpc("release_order_inventory", { p_tran_id: order.tran_id });
+      return NextResponse.json({ error: "Payment gateway is unavailable. Please try again." }, { status: 502 });
+    }
+  } catch (error) {
+    console.error("Checkout request failed", error);
+    return NextResponse.json({ error: "Invalid checkout request" }, { status: 400 });
   }
 }

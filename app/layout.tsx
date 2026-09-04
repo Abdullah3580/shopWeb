@@ -5,13 +5,22 @@ import { WishlistProvider } from "@/lib/wishlist-context";
 import Header from "@/components/Header";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import NewsletterForm from "@/components/NewsletterForm";
+import { supabaseAdmin } from "@/lib/supabase";
 
 export const metadata: Metadata = {
   title: "MyShopBD | সব কিছু, এক জায়গায়",
   description: "বাংলাদেশের অনলাইন মার্কেটপ্লেস — ইলেকট্রনিক্স, ফ্যাশন, হোম ও আরও অনেক কিছু।",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const { data: storeSettings } = await supabaseAdmin()
+    .from("store_settings")
+    .select("shop_name,store_address,contact_phone,contact_email")
+    .eq("id", 1)
+    .maybeSingle();
+  const shopName = storeSettings?.shop_name || "MyShopBD";
+  const storeAddress = storeSettings?.store_address || "ঠিকানা পাওয়া যায়নি";
+  const supportPhone = storeSettings?.contact_phone || "সাপোর্ট নম্বর সেট করা হয়নি";
   return (
     <html lang="bn">
       <body className="bg-gray-50 text-gray-900">
@@ -22,9 +31,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <footer className="bg-gray-900 text-gray-300 mt-12 pt-10 text-sm">
               <div className="max-w-7xl mx-auto px-4 grid grid-cols-2 md:grid-cols-4 gap-8 pb-8">
                 <div>
-                  <h4 className="text-white font-semibold mb-2">MyShopBD</h4>
-                  <p>ঢাকা, বাংলাদেশ</p>
-                  <p className="mt-1">কাস্টমার সাপোর্ট: সকাল ১০টা – রাত ৮টা (শনি–বৃহস্পতি)</p>
+                  <h4 className="text-white font-semibold mb-2">{shopName}</h4>
+                  <p>{storeAddress}</p>
+                  <p className="mt-1">কাস্টমার সাপোর্ট: {supportPhone}</p>
                 </div>
                 <div>
                   <h4 className="text-white font-semibold mb-2">সহায়তা</h4>
