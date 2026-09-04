@@ -6,6 +6,10 @@ import Header from "@/components/Header";
 import WhatsAppButton from "@/components/WhatsAppButton";
 import NewsletterForm from "@/components/NewsletterForm";
 import { supabaseAdmin } from "@/lib/supabase";
+import { Geist } from "next/font/google";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
   title: "MyShopBD | সব কিছু, এক জায়গায়",
@@ -22,7 +26,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const storeAddress = storeSettings?.store_address || "ঠিকানা পাওয়া যায়নি";
   const supportPhone = storeSettings?.contact_phone || "সাপোর্ট নম্বর সেট করা হয়নি";
   return (
-    <html lang="bn">
+    <html lang="bn" className={cn("font-sans", geist.variable)}>
       <body className="bg-gray-50 text-gray-900">
         <CartProvider>
           <WishlistProvider>
