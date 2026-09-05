@@ -1,12 +1,12 @@
 import { supabase } from "@/lib/supabase";
 import { notFound } from "next/navigation";
-import AddToCartButton from "@/components/AddToCartButton";
 import RecentlyViewedTracker from "@/components/RecentlyViewedTracker";
+import ProductMediaGallery from "@/components/product/ProductMediaGallery";
+import ProductInteractiveSection from "@/components/product/ProductInteractiveSection";
 
 export const revalidate = 60;
 
 export default async function ProductPage({ params }: { params: { id: string } }) {
-  // params.id is actually the product slug
   const { data: product } = await supabase
     .from("products")
     .select("*")
@@ -15,30 +15,33 @@ export default async function ProductPage({ params }: { params: { id: string } }
 
   if (!product) notFound();
 
-  const hasDiscount = product.compare_at_price && product.compare_at_price > product.price;
+  const galleryImages: string[] = product.images && product.images.length > 0 
+    ? product.images 
+    : [product.image_url || "https://placehold.co/600x600?text=No+Image"];
+
+  // ProductMediaGallery-এর প্রত্যাশিত ডাটা স্ট্রাকচার
+  const media = galleryImages.map((url, index) => ({
+    id: String(index),
+    url: url,
+    media_type: 'image' as const,
+    type: 'image' as const
+  }));
+
+  const mainImage = product.image_url || galleryImages[0] || "https://placehold.co/600x600?text=No+Image";
 
   return (
     <div className="grid md:grid-cols-2 gap-8">
       <RecentlyViewedTracker productId={product.id} />
-      <div className="aspect-square bg-white rounded-xl border overflow-hidden">
-        <img
-          src={product.images?.[0] || "https://placehold.co/600x600?text=No+Image"}
-          alt={product.name}
-          className="w-full h-full object-cover"
-        />
-      </div>
+      
+      {/* সঠিক Prop দিয়ে মিডিয়া গ্যালারি */}
+      <ProductMediaGallery media={media} mainImage={mainImage} />
 
       <div>
         <h1 className="text-2xl font-bold mb-2">{product.name}</h1>
-        <div className="flex items-center gap-3 mb-4">
-          <span className="text-2xl font-bold text-brand-600">৳{product.price}</span>
-          {hasDiscount && (
-            <span className="text-gray-400 line-through">৳{product.compare_at_price}</span>
-          )}
-        </div>
         <p className="text-gray-600 mb-6 whitespace-pre-line">{product.description}</p>
 
-        <AddToCartButton product={product} />
+        {/* ইন্টারঅ্যাক্টিভ সেকশন (প্রাইস, ভ্যারিয়েন্ট সিলেক্টর ও কার্ট বাটন) */}
+        <ProductInteractiveSection product={product} />
 
         <div className="mt-6 text-sm text-gray-500 space-y-1 border-t pt-4">
           <p>✓ ক্যাশ অন ডেলিভারি সুবিধা</p>
