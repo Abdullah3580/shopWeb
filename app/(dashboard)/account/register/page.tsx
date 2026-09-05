@@ -6,7 +6,7 @@ import Link from 'next/link';
 
 function RegisterForm() {
   const router = useRouter();
-  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [formData, setFormData] = useState({ full_name: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -16,7 +16,7 @@ function RegisterForm() {
     setError('');
 
     try {
-      const res = await fetch('/api/customer/auth/register', {
+      const res = await fetch('/api/customer/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
@@ -52,8 +52,8 @@ function RegisterForm() {
           <input
             type="text"
             required
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            value={formData.full_name}
+            onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
             className="mt-1 w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
             placeholder="John Doe"
           />
@@ -66,19 +66,46 @@ function RegisterForm() {
             required
             value={formData.email}
             onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            className="mt-1 w-full rounded-md bmɑ�Ɂ��́��ȁѕ�еʹ��������ѱ���������������ɥ���ȁ������ɥ���������(�����������������������􉹅���ᅵ��������(������������(��������𽑥��((�����������(����������񱅉��������9���􉉱����ѕ�е�́���е͕�������ѕ�е�Ʌ������A���ݽɐ𽱅����(��������������(���������������������ݽɐ�(������������ɕ�եɕ�(������������م�Ք�홽ɵ�ф�����ݽɑ�(��������������������졔�����͕��ɵ�ф�쀸����ɵ�ф������ݽɐ联�хɝ�йم�Ք����(�����������������9����дāܵ�ձ��ɽչ���������ɑ�ȁ��́��ȁѕ�еʹ��������ѱ���������������ɥ���ȁ������ɥ���������(����������������������������������������(������������(��������𽑥��((�����������ѽ�(����������������Չ��Ј(������������ͅ��������������(���������������9����ܵ�ձ���дāɽչ������������������ȸԁѕ�еʹ����е͕�������ѕ�еݡ�є��Ʌ�ͥѥ�����ٕ�鉜��Ʌ�������ͅ��������������(���������(����������������������ɕ�ѥ������չи����耝I����ѕȝ�(�����������ѽ��(������𽙽ɴ�((��������������9����ѕ�е���ѕȁѕ�е�́ѕ�е�Ʌ������(���������ready have an account?{' '}
+            className="mt-1 w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+            placeholder="name@example.com"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-gray-700">Password</label>
+          <input
+            type="password"
+            required
+            value={formData.password}
+            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+            className="mt-1 w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+            placeholder="••••••••"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full mt-1 rounded-md bg-black py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:opacity-50"
+        >
+          {loading ? 'Creating Account...' : 'Register'}
+        </button>
+      </form>
+
+      <p className="text-center text-xs text-gray-600">
+        Already have an account?{' '}
         <Link href="/account/login" className="font-semibold text-orange-500 hover:underline">
           Log In
         </Link>
       </p>
-    </div~
+    </div>
   );
 }
 
 export default function RegisterPage() {
   return (
     <div className="flex min-h-[70vh] items-center justify-center px-4 py-12">
-      <Suspense fallback={<div`className="text-sm text-gray-500">Loading...</div>}>
+      <Suspense fallback={<div className="text-sm text-gray-500">Loading...</div>}>
         <RegisterForm />
       </Suspense>
     </div>
