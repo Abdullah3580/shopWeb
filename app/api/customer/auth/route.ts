@@ -7,8 +7,10 @@ export async function POST(req: NextRequest) {
   const email = String(body.email || "").trim().toLowerCase();
   const password = String(body.password || "");
   if (!email || !password) return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
+  
   const { data, error } = await supabaseAdmin().auth.signInWithPassword({ email, password });
   if (error || !data.session) return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+
   const { data: device } = await supabaseAdmin().from("customer_devices").insert({
     user_id: data.user.id,
     device_name: String(req.headers.get("sec-ch-ua-platform") || "Web browser").replaceAll('"', "").slice(0, 80),
