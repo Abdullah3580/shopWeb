@@ -1,20 +1,21 @@
-﻿import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
+﻿import { NextResponse } from 'next/server';
+import { requireAdminRole } from '@/lib/admin-auth';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function GET() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll() } }
-  );
+  const session = await requireAdminRole(['manager', 'finance']);
+  if (!session) return NextResponse.json({ error: 'Analytics permission required' }, { status: 403 });
 
-  const { data: orders } = await supabase
+  const { data: orders, error } = await supabaseAdmin()
     .from('orders')
-    .select('total_amount, status, created_at');
+    .select('total, payment_status, created_at')
+    .eq('payment_status', 'paid');
+  if (error) {
+    console.error('Analytics query failed', error);
+    return NextResponse.json({ error: 'Unable to load analytics' }, { status: 500 });
+  }
 
-  const totalRevenue = orders?.reduce((acc, curr) => acc + Number(curr.total_amount || 0), 0) || 0;
+  const totalRevenue = orders?.reduce((acc, curr) => acc + Number(curr.total || 0), 0) || 0;
   const totalOrders = orders?.length || 0;
 
   return NextResponse.json({

@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
 
   const { code, orderAmount } = await request.json();
 
-  if (!code || typeof orderAmount !== 'number') {
+  if (typeof code !== 'string' || code.trim().length < 1 || code.trim().length > 40 || typeof orderAmount !== 'number' || !Number.isFinite(orderAmount) || orderAmount < 0) {
     return NextResponse.json({ error: 'Coupon code and valid order amount are required' }, { status: 400 });
   }
 

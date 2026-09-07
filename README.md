@@ -29,8 +29,6 @@
 
 ## যা এখনো নেই (পরের ধাপে যোগ করতে হবে)
 - মাল্টি-ভেন্ডর সাপোর্ট (একাধিক সেলার)
-- প্রোডাক্ট রিভিউ/রেটিং
-- ইউজার লগইন/অর্ডার হিস্টোরি
 - SMS/ইমেইল নোটিফিকেশন
 
 ## সেটআপ ধাপে ধাপে
@@ -44,13 +42,13 @@ npm install
 1. [supabase.com](https://supabase.com) → New Project
 2. SQL Editor-এ গিয়ে `supabase/schema.sql` এর পুরো কন্টেন্ট রান করুন
 3. এরপর `supabase/seed.sql` রান করুন (স্যাম্পল প্রোডাক্ট দেখতে চাইলে)
-4. Project Settings → API থেকে URL, anon key, service_role key কপি করুন
+4. Project Settings → API থেকে URL, anon key, service_role key কপি করুন। Service role key কখনো Git-এ commit করবেন না বা `NEXT_PUBLIC_*` নাম দেবেন না।
 
 যদি `categories already exists` error আসে, database আগে থেকেই তৈরি আছে। সেক্ষেত্রে পুরো `schema.sql` আবার চালাবেন না;
 শুধু `supabase/admin-migration.sql` চালান। এটি existing data না মুছে admin dashboard-এর নতুন টেবিলগুলো যোগ করবে।
 
 Phase 5-এর coupons, store settings এবং analytics database অংশের জন্য `supabase/phase5-migration.sql` আলাদা করে চালান।
-Phase 6-এর database reliability hardening-এর জন্য `supabase/phase-06-migration.sql` চালান।
+Phase 6-এর database reliability hardening-এর জন্য `supabase/phase-06-migration.sql` চালান। Customer portal-এর জন্য `supabase/customer-portal-migration.sql` এবং enterprise modules-এর migrations-ও ordered sequence-এ চালান।
 
 ### ৩.১ Admin dashboard সেটআপ
 1. Supabase Dashboard → Authentication → Users থেকে admin/staff user তৈরি করুন।
@@ -82,9 +80,12 @@ npm run dev
 ```
 [http://localhost:3000](http://localhost:3000) এ দেখুন।
 
+Authentication endpoints include a small process-local throttle for development and single-instance deployments. Use a distributed limiter such as Redis or a WAF before running multiple production instances.
+
 ### ৬. Deploy (Vercel)
 Chosma-র মতোই — GitHub-এ পুশ করে Vercel-এ ইম্পোর্ট করুন, environment variables Vercel dashboard-এ বসান।
 `NEXT_PUBLIC_APP_URL` অবশ্যই আপনার Vercel ডোমেইনে আপডেট করবেন, নাহলে SSLCommerz রিডাইরেক্ট কাজ করবে না।
+Production builds also require valid `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` environment variables.
 
 ## প্রোডাক্ট/ক্যাটাগরি যোগ করা
 `/admin` dashboard থেকে `categories` ও `products` যোগ এবং আপডেট করা যাবে। Database schema পরিবর্তন হলে
@@ -93,6 +94,6 @@ Supabase SQL Editor-এ `supabase/schema.sql` আবার রান করু�
 ## পরের ধাপগুলো (রিকমেন্ডেশন)
 1. আগে ১০-২০টা রিয়েল প্রোডাক্ট দিয়ে টেস্ট করুন, COD দিয়ে অর্ডার ফ্লো ভেরিফাই করুন
 2. SSLCommerz sandbox-এ পুরো পেমেন্ট ফ্লো টেস্ট করুন
-3. একটা সিম্পল admin পেজ বানান (প্রোডাক্ট add/edit করার জন্য) — Supabase Auth দিয়ে প্রোটেক্ট করা
+3. Admin mutation endpoints-এর role checks এবং customer ownership checks সহ end-to-end test করুন
 4. সার্চ যোগ করুন (Supabase full-text search বা Algolia)
 5. SSLCommerz merchant approval-এর জন্য আবেদন করুন (ট্রেড লাইসেন্স/ব্যবসার কাগজপত্র লাগবে)

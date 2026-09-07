@@ -1,27 +1,21 @@
-﻿import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
+import { getCustomerSession } from '@/lib/customer-auth';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id: orderId } = await params;
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll() } }
-  );
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const session = await getCustomerSession();
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const supabase = supabaseAdmin();
 
   const { data: order } = await supabase
     .from('orders')
-    .select('id, status, created_at')
+    .select('id, order_status, created_at')
     .eq('id', orderId)
-    .eq('user_id', user.id)
+    .eq('customer_user_id', session.user.id)
     .single();
 
   if (!order) {
@@ -29,12 +23,15 @@ export async function GET(
   }
 
   const { data: logs, error } = await supabase
-    .from('order_status_logs')
+    .from('order_status_history')
     .select('*')
     .eq('order_id', orderId)
     .order('created_at', { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error('Order tracking query failed', error);
+    return NextResponse.json({ error: 'Unable to load order tracking' }, { status: 500 });
+  }
 
-  return NextResponse.json({ currentStatus: order.status, timeline: logs || [] });
+  return NextResponse.json({ currentStatus: order.order_status, timeline: logs || [] });
 }

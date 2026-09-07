@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { clearCustomerCookies, customerCookieNames, getCustomerSession, setCustomerCookies } from "@/lib/customer-auth";
+import { getClientIp, rateLimit } from "@/lib/rate-limit";
 import { supabaseAdmin } from "@/lib/supabase";
 
 export async function POST(req: NextRequest) {
+  const ipLimit = rateLimit(`customer-login:${getClientIp(req)}`, 10, 15 * 60 * 1000);
+  if (!ipLimit.allowed) return NextResponse.json({ error: "Too many attempts" }, { status: 429, headers: { "Retry-After": String(ipLimit.retryAfter) } });
   const body = await req.json().catch(() => ({}));
   const email = String(body.email || "").trim().toLowerCase();
   const password = String(body.password || "");
-  if (!email || !password) return NextResponse.json({ error: "Email and password are required" }, { status: 400 });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 160 || password.length < 8 || password.length > 200) {
+    return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+  }
   
   const { data, error } = await supabaseAdmin().auth.signInWithPassword({ email, password });
   if (error || !data.session) return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });

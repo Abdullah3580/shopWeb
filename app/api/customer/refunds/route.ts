@@ -1,61 +1,57 @@
-﻿import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
-import { NextRequest, NextResponse } from 'next/server';
+﻿import { NextRequest, NextResponse } from 'next/server';
+import { getCustomerSession } from '@/lib/customer-auth';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function GET() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll() } }
-  );
+  const session = await getCustomerSession();
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin()
     .from('order_refunds')
-    .select(`*, orders ( id, total_amount, status )`)
-    .eq('user_id', user.id)
+    .select(`*, orders ( id, total, order_status )`)
+    .eq('user_id', session.user.id)
     .order('created_at', { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error('Refund query failed', error);
+    return NextResponse.json({ error: 'Unable to load refunds' }, { status: 500 });
+  }
   return NextResponse.json({ refunds: data });
 }
 
 export async function POST(request: NextRequest) {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll() } }
-  );
+  const session = await getCustomerSession();
+  if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const body = await request.json().catch(() => ({}));
+  const orderId = typeof body.orderId === 'string' ? body.orderId : '';
+  const amount = Number(body.amount);
+  const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 1000) : '';
 
-  const { orderId, amount, reason } = await request.json();
-
-  if (!orderId || !amount || !reason) {
+  if (!/^[0-9a-f-]{36}$/i.test(orderId) || !Number.isFinite(amount) || amount <= 0 || !reason) {
     return NextResponse.json({ error: 'Order ID, amount, and reason are required' }, { status: 400 });
   }
 
+  const supabase = supabaseAdmin();
   const { data: order } = await supabase
     .from('orders')
-    .select('id, user_id, status')
+    .select('id, total, customer_user_id, order_status')
     .eq('id', orderId)
-    .eq('user_id', user.id)
+    .eq('customer_user_id', session.user.id)
     .single();
 
   if (!order) {
     return NextResponse.json({ error: 'Order not found' }, { status: 404 });
+  }
+  if (amount > Number(order.total) || !['delivered', 'cancelled'].includes(order.order_status)) {
+    return NextResponse.json({ error: 'This order is not eligible for a refund' }, { status: 400 });
   }
 
   const { data, error } = await supabase
     .from('order_refunds')
     .insert({
       order_id: orderId,
-      user_id: user.id,
+      user_id: session.user.id,
       amount,
       reason,
       status: 'pending'
@@ -63,6 +59,9 @@ export async function POST(request: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    console.error('Refund creation failed', error);
+    return NextResponse.json({ error: 'Unable to create refund request' }, { status: 500 });
+  }
   return NextResponse.json({ refund: data });
 }

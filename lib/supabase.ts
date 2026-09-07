@@ -1,3 +1,4 @@
+import "server-only";
 import { createClient } from "@supabase/supabase-js";
 
 // Public client — safe to use in the browser. Only reads categories/active products (RLS enforced).
