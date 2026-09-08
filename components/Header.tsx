@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useCart } from "@/lib/cart-context";
 import { OfferBar } from "@/components/Hero";
 import { useEffect, useState } from "react";
@@ -9,11 +10,24 @@ import SearchBox from "@/components/SearchBox";
 import MegaMenu from "@/components/MegaMenu";
 
 export default function Header() {
+  const router = useRouter();
+  const pathname = usePathname();
   const { totalCount } = useCart();
   const { ids } = useWishlist();
   const [authenticated, setAuthenticated] = useState(false);
-  useEffect(() => { fetch("/api/customer/auth").then((response) => response.json()).then((result) => setAuthenticated(Boolean(result.authenticated))); }, []);
-  async function logout() { await fetch("/api/customer/auth", { method: "DELETE" }); setAuthenticated(false); }
+
+  useEffect(() => {
+    fetch("/api/customer/auth", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((result) => setAuthenticated(Boolean(result.authenticated)));
+  }, [pathname]);
+
+  async function logout() { 
+    await fetch("/api/customer/auth", { method: "DELETE" }); 
+    setAuthenticated(false);
+    router.push("/");
+    router.refresh();
+  }
 
   return (
     <div className="sticky top-0 z-50">

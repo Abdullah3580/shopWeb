@@ -14,7 +14,15 @@ export async function POST(req: NextRequest) {
   }
   
   const { data, error } = await supabaseAdmin().auth.signInWithPassword({ email, password });
-  if (error || !data.session) return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+  if (error || !data.session) {
+    if (error?.message?.toLowerCase().includes("email not confirmed")) {
+      return NextResponse.json(
+        { error: "আপনার ইমেইলটি ভেরিফাই করা হয়নি। অনুগ্রহ করে ইনবক্স বা স্প্যাম ফোল্ডার চেক করুন।" },
+        { status: 403 }
+      );
+    }
+    return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
+  }
 
   const { data: device } = await supabaseAdmin().from("customer_devices").insert({
     user_id: data.user.id,

@@ -29,9 +29,8 @@ function LoginForm() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Login failed');
 
-      // সেশন ডাটা রিফ্রেশ করে /account পেজে রিডাইরেক্ট
-      router.refresh();
-      router.push('/account');
+      // সরাসরি হোম পেজে রিডাইরেক্ট ও রিফ্রেশ
+      window.location.href = '/';
     } catch (err: any) {
       setError(err.message || 'Invalid credentials');
     } finally {

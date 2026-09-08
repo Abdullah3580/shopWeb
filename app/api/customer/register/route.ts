@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ২. ইউজার তৈরি ও অটো-কনফার্মকরণ (email_confirm: true)
+    // ২. ইউজার তৈরি করা
     const { data, error } = await supabaseAdmin().auth.admin.createUser({
       email,
       password,
@@ -38,6 +38,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ভেরিফিকেশন ইমেইল পাঠানো
+    await supabaseAdmin().auth.resend({
+      type: "signup",
+      email,
+    });
+
     // ৩. customer_profiles টেবিলে প্রোফাইল ডাটা যুক্ত করা
     const { error: profileError } = await supabaseAdmin()
       .from("customer_profiles")
@@ -54,7 +60,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         user: data.user,
-        message: "Account created successfully! You can now log in.",
+        message: "Account created successfully! Please check your email to verify your account.",
       },
       { status: 201 }
     );
