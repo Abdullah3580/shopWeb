@@ -4,7 +4,8 @@ import { supabaseAdmin } from "@/lib/supabase";
 const sorts = new Set(["newest", "price_asc", "price_desc", "rating", "popularity"]);
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
-  const queryText = params.get("q")?.trim() || "";
+  // strip characters that have special meaning inside a PostgREST or() filter
+  const queryText = (params.get("q") || "").replace(/[,()*\\%_]/g, " ").trim().slice(0, 80);
   const page = Math.max(Number(params.get("page") || 1), 1);
   const pageSize = Math.min(Math.max(Number(params.get("page_size") || 24), 1), 60);
   let query = supabaseAdmin().from("products").select("*, brands(name)", { count: "exact" }).eq("is_active", true);

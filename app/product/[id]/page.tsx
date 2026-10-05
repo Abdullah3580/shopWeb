@@ -6,11 +6,12 @@ import ProductInteractiveSection from "@/components/product/ProductInteractiveSe
 
 export const revalidate = 60;
 
-export default async function ProductPage({ params }: { params: { id: string } }) {
+export default async function ProductPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const { data: product } = await supabase
     .from("products")
     .select("*")
-    .eq("slug", params.id)
+    .eq("slug", id)
     .single();
 
   if (!product) notFound();

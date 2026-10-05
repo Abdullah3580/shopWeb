@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     const { data, error } = await supabaseAdmin().auth.admin.createUser({
       email,
       password,
-      email_confirm: false,
+      email_confirm: true,
       user_metadata: {
         full_name: fullName,
         phone: phone || null,
@@ -38,11 +38,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ভেরিফিকেশন ইমেইল পাঠানো
-    await supabaseAdmin().auth.resend({
-      type: "signup",
-      email,
-    });
+    // // ভেরিফিকেশন ইমেইল পাঠানো
+    // const { error: resendError } = await supabaseAdmin().auth.resend({
+    //   type: "signup",
+    //   email,
+    // });
+
+    // if (resendError) {
+    //   console.error("Verification email error:", resendError.message);
+    // }
 
     // ৩. customer_profiles টেবিলে প্রোফাইল ডাটা যুক্ত করা
     const { error: profileError } = await supabaseAdmin()
@@ -55,12 +59,15 @@ export async function POST(req: NextRequest) {
 
     if (profileError) {
       console.error("Profile creation error:", profileError);
+      // Roll back the auth user so the person can simply try again
+      await supabaseAdmin().auth.admin.deleteUser(data.user.id);
+      return NextResponse.json({ error: "Could not finish creating your account. Please try again." }, { status: 500 });
     }
 
     return NextResponse.json(
       {
         user: data.user,
-        message: "Account created successfully! Please check your email to verify your account.",
+        message: "Account created successfully! You can sign in now.",
       },
       { status: 201 }
     );

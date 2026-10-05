@@ -5,11 +5,12 @@ import { notFound } from "next/navigation";
 
 export const revalidate = 60;
 
-export default async function CategoryPage({ params }: { params: { slug: string } }) {
+export default async function CategoryPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
   const { data: category } = await supabase
     .from("categories")
     .select("*")
-    .eq("slug", params.slug)
+    .eq("slug", slug)
     .single();
 
   if (!category) notFound();

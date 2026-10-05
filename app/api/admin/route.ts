@@ -85,12 +85,28 @@ export async function POST(req: NextRequest) {
     if (body.action === "update_order") {
       if (!session.roles.some((role) => ["owner", "manager", "fulfillment", "finance"].includes(role))) return NextResponse.json({ error: "Order management permission required" }, { status: 403 });
       const { id, order_status, payment_status } = body;
+      const allowedOrderStatuses = ["processing", "shipped", "delivered", "cancelled"];
+      const allowedPaymentStatuses = ["pending", "paid", "failed", "cancelled"];
+      if (typeof id !== "string" || !id) return NextResponse.json({ error: "Order ID is required" }, { status: 400 });
       const updates: Record<string, string> = {};
-      if (order_status) updates.order_status = order_status;
-      if (payment_status) updates.payment_status = payment_status;
+      if (order_status) {
+        if (!allowedOrderStatuses.includes(order_status)) return NextResponse.json({ error: "Invalid order status" }, { status: 400 });
+        updates.order_status = order_status;
+      }
+      if (payment_status) {
+        if (!allowedPaymentStatuses.includes(payment_status)) return NextResponse.json({ error: "Invalid payment status" }, { status: 400 });
+        // Only finance-type roles may change payment state (same rule as /api/admin/orders)
+        if (!session.roles.some((role) => ["owner", "manager", "finance"].includes(role))) return NextResponse.json({ error: "Finance permission required to change payment status" }, { status: 403 });
+        updates.payment_status = payment_status;
+      }
+      if (!Object.keys(updates).length) return NextResponse.json({ error: "No valid updates" }, { status: 400 });
       const { data, error } = await supabase.from("orders").update(updates).eq("id", id).select().single();
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });
       if (order_status) await supabase.from("order_status_history").insert({ order_id: id, status: order_status, note: "Updated from admin dashboard" });
+      if (order_status === "cancelled") {
+        const { error: releaseError } = await supabase.rpc("release_order_inventory", { p_tran_id: data.tran_id });
+        if (releaseError) return NextResponse.json({ error: releaseError.message }, { status: 400 });
+      }
       await logActivity(supabase, "Updated order", "order", id, updates);
       return NextResponse.json({ data });
     }

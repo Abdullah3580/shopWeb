@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
   const page = Math.max(Number(params.get("page") || 1), 1);
   const pageSize = Math.min(Math.max(Number(params.get("page_size") || 20), 1), 100);
-  const search = params.get("search")?.trim();
+  const search = (params.get("search") || "").replace(/[,()*\\%_]/g, " ").trim().slice(0, 80);
   const from = params.get("from");
   const to = params.get("to");
   const orderStatus = params.get("order_status");

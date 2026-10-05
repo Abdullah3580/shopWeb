@@ -17,7 +17,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   const supabase = supabaseAdmin();
-  const { error: updateError } = await supabase.from("orders").update({ order_status: newStatus }).eq("id", orderId);
+  const { data: updatedOrder, error: updateError } = await supabase.from("orders").update({ order_status: newStatus }).eq("id", orderId).select("tran_id").single();
   if (updateError) {
     console.error("Order status update failed", updateError);
     return NextResponse.json({ error: "Unable to update order status" }, { status: 500 });
@@ -29,6 +29,14 @@ export async function PATCH(request: NextRequest) {
     note: notes || `Status updated to ${newStatus}`,
   });
   if (logError) console.error("Order status audit log failed", logError);
+
+  if (newStatus === "cancelled" && updatedOrder?.tran_id) {
+    const { error: releaseError } = await supabase.rpc("release_order_inventory", { p_tran_id: updatedOrder.tran_id });
+    if (releaseError) {
+      console.error("Inventory release failed", releaseError);
+      return NextResponse.json({ error: "Order cancelled but stock release failed" }, { status: 500 });
+    }
+  }
 
   return NextResponse.json({ success: true });
 }

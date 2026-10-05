@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     { cookies: { getAll: () => cookieStore.getAll() } }
   );
 
-  const { code, orderAmount } = await request.json();
+  const { code, orderAmount } = await request.json().catch(() => ({} as { code?: unknown; orderAmount?: unknown }));
 
   if (typeof code !== 'string' || code.trim().length < 1 || code.trim().length > 40 || typeof orderAmount !== 'number' || !Number.isFinite(orderAmount) || orderAmount < 0) {
     return NextResponse.json({ error: 'Coupon code and valid order amount are required' }, { status: 400 });
