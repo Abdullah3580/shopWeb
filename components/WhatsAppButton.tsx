@@ -1,5 +1,5 @@
 // Replace the phone number with your real WhatsApp business number (country code, no +/spaces).
-const WHATSAPP_NUMBER = "8801XXXXXXXXX";
+const WHATSAPP_NUMBER = "8801571529203";
 
 export default function WhatsAppButton() {
   return (

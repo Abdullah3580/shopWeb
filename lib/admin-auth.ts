@@ -20,6 +20,8 @@ export async function getAdminSession() {
 export async function requireAdminRole(allowedRoles?: AdminRole[]) {
   const session = await getAdminSession();
   if (!session) return null;
+  // A logged-in user with NO admin role (e.g. a normal customer) must never pass.
+  if (!session.roles.length) return null;
   if (allowedRoles?.length && !session.roles.some((role) => role === "owner" || allowedRoles.includes(role))) return null;
   return session;
 }

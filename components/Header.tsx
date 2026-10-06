@@ -19,7 +19,8 @@ export default function Header() {
   useEffect(() => {
     fetch("/api/customer/auth", { cache: "no-store" })
       .then((response) => response.json())
-      .then((result) => setAuthenticated(Boolean(result.authenticated)));
+      .then((result) => setAuthenticated(Boolean(result.authenticated)))
+      .catch(() => setAuthenticated(false));
   }, [pathname]);
 
   async function logout() { 
@@ -40,11 +41,6 @@ export default function Header() {
 
           <div className="flex-1 max-w-xl hidden md:block">
             <SearchBox />
-            <input
-              type="text"
-              placeholder="প্রোডাক্ট খুঁজুন..."
-              className="hidden"
-            />
           </div>
 
           <Link

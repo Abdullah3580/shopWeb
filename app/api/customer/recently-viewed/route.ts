@@ -1,6 +1,7 @@
+//D:\Desktop\-\startup\shopWeb\app\api\customer\recently-viewed\route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { getCustomerSession } from "@/lib/customer-auth";
-import { supabase, supabaseAdmin } from "@/lib/supabase";
+import { supabaseAdmin } from "@/lib/supabase";
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
@@ -17,7 +18,9 @@ export async function POST(req: NextRequest) {
 export async function GET() {
   const session = await getCustomerSession();
   if (!session) return NextResponse.json({ products: [] });
-  const { data, error } = await supabase.from("recently_viewed_products").select("viewed_at,products(*)").eq("user_id", session.user.id).order("viewed_at", { ascending: false }).limit(20);
+  // The anon client has no logged-in user in RLS terms, so it always returned an empty list.
+  // Use the server client, filter by the verified session user, and hide inactive products.
+  const { data, error } = await supabaseAdmin().from("recently_viewed_products").select("viewed_at,products!inner(*)").eq("user_id", session.user.id).eq("products.is_active", true).order("viewed_at", { ascending: false }).limit(20);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ products: data || [] });
 }
